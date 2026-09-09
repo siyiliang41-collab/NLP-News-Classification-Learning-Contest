@@ -1,5 +1,8 @@
-model,detail,cv_f1,std,note
+﻿model,detail,cv_f1,std,note
 tfidf_lr,baseline,0.8463,0.0038,"TF-IDF(1-2gram,5w特征) + SGDClassifier(log_loss)"
 word2vec_textcnn,baseline,0.9183,0.0024,"Word2Vec(skip-gram,128d)+TextCNN(filters=[2, 3, 4]), 5折CV, epochs=5"
 bert,base-chinese_maxlen512_sub0_ep3,0.924,,"bert-base-chinese 微调, 200000 训练样本"
-ensemble,hard_vote_3model,0.9332,,BERT+TextCNN+TFIDF-LR Ӳ����ͶƱ
+ensemble,hard_vote_3model,0.9332,,BERT+TextCNN+TFIDF-LR 硬编码融合分数
+textcnn,loss_ce,0.9042,,"TextCNN + 普通交叉熵 CE, holdout, epochs=3"
+textcnn,loss_weighted,0.875,,"TextCNN + 类别权重交叉熵 (balanced), holdout, epochs=3"
+textcnn,loss_focal,0.8886,,"TextCNN + Focal Loss (gamma=2, 带权重), holdout, epochs=3"
