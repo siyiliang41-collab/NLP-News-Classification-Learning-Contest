@@ -1,4 +1,4 @@
 model,detail,cv_f1,std,note
 tfidf_lr,baseline,0.8463,0.0038,"TF-IDF(1-2gram,5w特征) + SGDClassifier(log_loss)"
-word2vec_textcnn,baseline,0.9180,0.0025,"Word2Vec(CBOW,128d)+TextCNN, 3折CV(0.9201/0.9146/0.9194)"
-word2vec_textcnn,baseline,0.9183,0.0024,"Word2Vec(128d)+TextCNN(filters=[2, 3, 4]), epochs=5"
+word2vec_textcnn,baseline,0.9183,0.0024,"Word2Vec(skip-gram,128d)+TextCNN(filters=[2, 3, 4]), 5折CV, epochs=5"
+bert,base-chinese_maxlen512_sub0_ep3,0.9240,,"bert-base-chinese 微调, 200000 训练样本"
