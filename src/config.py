@@ -22,9 +22,10 @@ def _find_data_dir():
         r"C:\Users\10730\Desktop\26秋小学期\data",   # 本地 Windows
         os.path.join(BASE_DIR, "data"),              # 项目内 data/
         os.path.join(BASE_DIR, "data", "train"),     # 项目内 data/train/
-        "/root/autodl-tmp",                          # AutoDL
-        "/mnt/workspace/data",                       # 阿里云 PAI
+        "/mnt/workspace/TEMP-FILE-STATION",          # 阿里云 PAI DSW 网页上传默认路径
+        "/mnt/workspace/data",                       # 阿里云 PAI 手动建目录
         "/mnt/workspace",                            # 阿里云 PAI 根目录
+        "/root/autodl-tmp",                          # AutoDL
     ]
     for c in candidates:
         if os.path.exists(os.path.join(c, "train_set.csv")):
