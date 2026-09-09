@@ -3,7 +3,9 @@
 全局配置：数据路径、类别映射、实验超参统一入口。
 所有脚本从这里 import，避免散落的硬编码路径。
 
-数据路径自动定位：优先环境变量 DATA_DIR，其次在常见位置自动探测 train_set.csv，
+数据路径自动定位：优先环境变量 DATA_DIR，其次在常见位置自动探测各数据文件。
+支持两种布局——平铺（train_set.csv 与 test_a.csv/test_b.csv 同目录）与
+项目内子目录（data/train、data/test_a、data/test_b），
 本地（Windows）和云端（AutoDL/阿里云PAI）都不用手动改路径。
 """
 import os
@@ -12,33 +14,48 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _find_data_dir():
-    """自动定位含 train_set.csv 的数据目录。"""
+def _candidate_roots():
+    """数据根目录候选，按优先级排列。"""
+    roots = []
     env = os.environ.get("DATA_DIR")
-    if env and os.path.exists(os.path.join(env, "train_set.csv")):
-        return env
-
-    candidates = [
+    if env:
+        roots.append(env)
+    roots += [
         r"C:\Users\10730\Desktop\26秋小学期\data",   # 本地 Windows
         os.path.join(BASE_DIR, "data"),              # 项目内 data/
-        os.path.join(BASE_DIR, "data", "train"),     # 项目内 data/train/
         "/mnt/workspace/TEMP-FILE-STATION",          # 阿里云 PAI DSW 网页上传默认路径
         "/mnt/workspace/data",                       # 阿里云 PAI 手动建目录
         "/mnt/workspace",                            # 阿里云 PAI 根目录
         "/root/autodl-tmp",                          # AutoDL
     ]
-    for c in candidates:
-        if os.path.exists(os.path.join(c, "train_set.csv")):
-            return c
-    # 兜底：返回第一个候选（若数据未就位，会在读取时报错）
-    return candidates[0]
+    return roots
 
 
-DATA_DIR = _find_data_dir()
+def _find(name, subdirs):
+    """在候选根目录 + 子目录组合中查找数据文件，返回第一个存在的路径。
 
-TRAIN_PATH = os.path.join(DATA_DIR, "train_set.csv")
-TEST_A_PATH = os.path.join(DATA_DIR, "test_a.csv")
-TEST_B_PATH = os.path.join(DATA_DIR, "test_b.csv")
+    subdirs 依次尝试（如 ["", "train"] 表示先查平铺再查 train/ 子目录），
+    找不到返回 None。
+    """
+    for root in _candidate_roots():
+        for sub in subdirs:
+            path = os.path.join(root, sub, name)
+            if os.path.exists(path):
+                return path
+    return None
+
+
+# 训练集与测试集可能平铺在同一目录，也可能分属 train/test_a/test_b 子目录，
+# 各自独立定位；兜底指向项目默认布局，数据未就位时读取会给出清晰报错。
+TRAIN_PATH = _find("train_set.csv", ["", "train"]) \
+    or os.path.join(BASE_DIR, "data", "train", "train_set.csv")
+TEST_A_PATH = _find("test_a.csv", ["", "test_a"]) \
+    or os.path.join(BASE_DIR, "data", "test_a", "test_a.csv")
+TEST_B_PATH = _find("test_b.csv", ["", "test_b"]) \
+    or os.path.join(BASE_DIR, "data", "test_b", "test_b.csv")
+
+# 指向实际训练数据所在目录（供日志/排查用，无外部依赖）
+DATA_DIR = os.path.dirname(TRAIN_PATH)
 
 # ---------- 项目内输出目录 ----------
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")

@@ -4,7 +4,7 @@
 供后面的「性能迭代可视化」直接读取绘图。
 
 字段说明：
-    model      模型名（如 tfidf_lr / fasttext / textcnn / bilstm_attn / bert）
+    model      模型名（如 tfidf_lr / textcnn / bilstm_attn / bert）
     detail     变体/技巧说明（如 baseline / 加对抗训练 / 加融合）
     cv_f1      K 折交叉验证 macro F1 均值
     std        各折标准差

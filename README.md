@@ -42,7 +42,7 @@ label_map = {
 ## 技术路线（逐级上分）
 
 ```
-TF-IDF + LR (baseline) → fastText → Word2Vec + TextCNN
+TF-IDF + LR (baseline) → Word2Vec + TextCNN
   → BiLSTM + Attention → BERT 微调 → 多模型融合
 ```
 
