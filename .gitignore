@@ -5,7 +5,8 @@ data/submit/*.csv
 
 # Models & outputs
 models/
-output/
+output/*
+!output/figs/
 
 # Python
 __pycache__/

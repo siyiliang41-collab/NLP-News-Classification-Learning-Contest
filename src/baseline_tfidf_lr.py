@@ -1,92 +1,95 @@
 # -*- coding: utf-8 -*-
 """
-Baseline: TF-IDF + 逻辑回归
-用于打通完整数据流：读取 -> 预处理 -> 训练 -> 预测 -> 按 sample 格式提交。
+Baseline: TF-IDF + 线性分类器（SGDClassifier, loss=log_loss 等价逻辑回归）
+1. 读数据 -> 2. 5折CV 评估 -> 3. 记录分数 -> 4. 预测 test_a 生成提交文件
 
-数据格式：
-    train_set.csv 列: label(0~13), text(空格分隔的匿名数字 token)，'\t' 分隔
-    test_a.csv    列: text(同样格式)
+选择 SGDClassifier 而非 LogisticRegression(liblinear) 的原因：
+    14 类下 liblinear 需训练 14 个 one-vs-rest 二分类器，20w 数据极慢；
+    SGD 原生多分类，速度快一个量级，精度与 LR 相当。
 
 运行：
     python src/baseline_tfidf_lr.py
 """
 import os
+import time
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score, classification_report
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import f1_score
 
-# ---------- 路径配置 ----------
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TRAIN_PATH = os.path.join(BASE, "data", "train", "train_set.csv")
-TEST_PATH = os.path.join(BASE, "data", "test_a", "test_a.csv")
-SAMPLE_PATH = os.path.join(BASE, "data", "test_a", "test_a_sample_submit.csv")
-SUBMIT_PATH = os.path.join(BASE, "data", "submit", "submit_baseline_tfidf_lr.csv")
+from config import TRAIN_PATH, TEST_A_PATH, SUBMIT_DIR, SEED, N_FOLDS
+from scoreboard import record
 
-LABEL_MAP = {
-    '科技': 0, '股票': 1, '体育': 2, '娱乐': 3, '时政': 4, '社会': 5, '教育': 6,
-    '财经': 7, '家居': 8, '游戏': 9, '房产': 10, '时尚': 11, '彩票': 12, '星座': 13,
-}
-ID2LABEL = {v: k for k, v in LABEL_MAP.items()}
+SUBMIT_PATH = os.path.join(SUBMIT_DIR, "submit_baseline_tfidf_lr.csv")
 
 
-def load_data():
-    train = pd.read_csv(TRAIN_PATH, sep="\t")
-    test = pd.read_csv(TEST_PATH, sep="\t")
-    print(f"[数据] 训练集 {train.shape[0]} 条, 测试集 {test.shape[0]} 条")
-    print(f"[数据] 训练集列: {list(train.columns)}")
-    print(f"[数据] 标签分布:\n{train['label'].value_counts().sort_index()}")
-    return train, test
+def build_vectorizer():
+    # token 是空格分隔的纯数字，用默认 C 级 token_pattern 切分（远快于 Python split）
+    return TfidfVectorizer(
+        token_pattern=r"\d+",     # 只匹配数字 token
+        ngram_range=(1, 2),
+        max_features=50000,
+        min_df=3,
+        sublinear_tf=True,
+        dtype=np.float32,
+    )
+
+
+def build_model():
+    # log_loss 即逻辑回归的损失，SGD 求解
+    return SGDClassifier(
+        loss="log_loss",
+        alpha=1e-4,
+        max_iter=30,
+        random_state=SEED,
+        n_jobs=-1,
+    )
 
 
 def main():
-    train, test = load_data()
-    X_train, y_train = train["text"].astype(str), train["label"].values
-    X_test = test["text"].astype(str)
+    t0 = time.time()
+    print("[1/4] 读取数据...")
+    train = pd.read_csv(TRAIN_PATH, sep="\t")
+    test = pd.read_csv(TEST_A_PATH, sep="\t")
+    X = train["text"].astype(str).values
+    y = train["label"].values
+    print(f"      训练 {len(X)} 条, 测试 {len(test)} 条")
 
-    # 文本是空格分隔的数字 token，分词器用 split；token 按空格切，用 ngram_range 捕获局部共现
-    vectorizer = TfidfVectorizer(
-        tokenizer=str.split,
-        ngram_range=(1, 2),
-        max_features=50000,
-        min_df=5,
-        sublinear_tf=True,
-    )
-    print("[向量化] 开始 TF-IDF 拟合...")
-    X_train_tfidf = vectorizer.fit_transform(X_train)
-    X_test_tfidf = vectorizer.transform(X_test)
-    print(f"[向量化] 特征维度: {X_train_tfidf.shape[1]}")
+    print("[2/4] 5折交叉验证评估...")
+    vectorizer = build_vectorizer()
+    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
+    fold_scores = []
 
-    clf = LogisticRegression(
-        C=4.0,
-        solver="liblinear",
-        max_iter=200,
-        n_jobs=-1,
-    )
-    print("[训练] 开始逻辑回归训练...")
-    clf.fit(X_train_tfidf, y_train)
+    for fold, (tr_idx, va_idx) in enumerate(skf.split(X, y), 1):
+        X_tr = vectorizer.fit_transform(X[tr_idx])
+        X_va = vectorizer.transform(X[va_idx])
+        clf = build_model()
+        clf.fit(X_tr, y[tr_idx])
+        y_va_pred = clf.predict(X_va)
+        f1 = f1_score(y[va_idx], y_va_pred, average="macro")
+        fold_scores.append(f1)
+        print(f"      fold {fold}: macro F1 = {f1:.4f}  (用时 {time.time()-t0:.0f}s)")
 
-    # 训练集上的 macro F1（仅参考，非线上分数）
-    y_train_pred = clf.predict(X_train_tfidf)
-    train_f1 = f1_score(y_train, y_train_pred, average="macro")
-    print(f"[评估] 训练集 macro F1 = {train_f1:.4f}")
+    cv_f1 = float(np.mean(fold_scores))
+    std = float(np.std(fold_scores))
+    print(f"      => CV macro F1 = {cv_f1:.4f} ± {std:.4f}")
 
-    # 预测测试集
-    y_pred = clf.predict(X_test_tfidf)
-    print("[预测] 完成，类别分布:")
-    print(pd.Series(y_pred).value_counts().sort_index())
+    record("tfidf_lr", "baseline", cv_f1, std, "TF-IDF(1-2gram,5w特征) + SGDClassifier(log_loss)")
 
-    # 对齐 sample_submit 格式
-    sample = pd.read_csv(SAMPLE_PATH)
-    submit = sample.copy()
-    submit["label"] = y_pred
+    print("[3/4] 全量训练并预测 test_a...")
+    X_all = vectorizer.fit_transform(X)
+    clf = build_model()
+    clf.fit(X_all, y)
+    y_pred = clf.predict(vectorizer.transform(test["text"].astype(str).values))
 
-    os.makedirs(os.path.dirname(SUBMIT_PATH), exist_ok=True)
+    print("[4/4] 生成提交文件...")
+    submit = pd.DataFrame({"label": y_pred})
+    os.makedirs(SUBMIT_DIR, exist_ok=True)
     submit.to_csv(SUBMIT_PATH, index=False)
-    print(f"[提交] 已写出 {SUBMIT_PATH}, 共 {len(submit)} 行")
-    print(f"[提交] 列名: {list(submit.columns)}")
-    print("[提示] 上传此文件到天池即可获得线上 macro F1 排名。")
+    print(f"      已写出 {SUBMIT_PATH}, 共 {len(submit)} 行")
+    print(f"[完成] 总用时 {time.time()-t0:.0f}s")
 
 
 if __name__ == "__main__":

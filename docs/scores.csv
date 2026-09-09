@@ -1,0 +1,2 @@
+model,detail,cv_f1,std,note
+tfidf_lr,baseline,0.8463,0.0038,"TF-IDF(1-2gram,5w特征) + SGDClassifier(log_loss)"
