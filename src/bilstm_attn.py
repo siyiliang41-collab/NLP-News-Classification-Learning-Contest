@@ -17,7 +17,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from config import TRAIN_PATH, TEST_A_PATH, SUBMIT_DIR, SEED, N_FOLDS, NUM_CLASSES
 from scoreboard import record
@@ -37,8 +37,9 @@ def build_model(vocab, embed_matrix, device):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--subset", type=int, default=0)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--gpu", action="store_true")
+    parser.add_argument("--holdout", action="store_true", help="用留出验证集代替5折CV（省时）")
     args = parser.parse_args()
 
     common.set_seed(SEED)
@@ -65,27 +66,42 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
 
-    print("[4/6] 5折交叉验证评估...")
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
-    fold_scores = []
-    for fold, (tr_idx, va_idx) in enumerate(skf.split(texts, labels), 1):
+    print("[4/6] 评估...")
+    if args.holdout:
+        tr_texts, va_texts, tr_labels, va_labels = train_test_split(
+            texts, labels, test_size=0.1, random_state=SEED, stratify=labels)
         model = build_model(vocab, embed_matrix, device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-        tr_ds = common.NewsDataset(texts[tr_idx], labels[tr_idx], vocab)
-        va_ds = common.NewsDataset(texts[va_idx], labels[va_idx], vocab)
-        tr_loader = DataLoader(tr_ds, batch_size=BATCH_SIZE, shuffle=True)
-        va_loader = DataLoader(va_ds, batch_size=BATCH_SIZE)
+        tr_loader = DataLoader(common.NewsDataset(tr_texts, tr_labels, vocab), batch_size=BATCH_SIZE, shuffle=True)
+        va_loader = DataLoader(common.NewsDataset(va_texts, va_labels, vocab), batch_size=BATCH_SIZE)
         for ep in range(args.epochs):
             loss, acc = common.train_one_epoch(model, tr_loader, optimizer, criterion, device)
-            print(f"      fold {fold} ep {ep+1}: loss={loss:.4f} acc={acc:.4f}")
+            print(f"      ep {ep+1}: loss={loss:.4f} acc={acc:.4f}")
         f1 = common.evaluate(model, va_loader, device)
-        fold_scores.append(f1)
-        print(f"      fold {fold}: macro F1 = {f1:.4f}  (用时 {time.time()-t0:.0f}s)")
-    cv_f1 = float(np.mean(fold_scores))
-    std = float(np.std(fold_scores))
-    print(f"      => CV macro F1 = {cv_f1:.4f} ± {std:.4f}")
-    record("word2vec_bilstm_attn", "baseline", cv_f1, std,
-           f"Word2Vec({common.EMBED_DIM}d)+BiLSTM(128)+Attention, epochs={args.epochs}")
+        print(f"      => val macro F1 = {f1:.4f}")
+        record("word2vec_bilstm_attn", "baseline", f1, None,
+               f"Word2Vec({common.EMBED_DIM}d)+BiLSTM(128)+Attention, holdout, epochs={args.epochs}")
+    else:
+        skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
+        fold_scores = []
+        for fold, (tr_idx, va_idx) in enumerate(skf.split(texts, labels), 1):
+            model = build_model(vocab, embed_matrix, device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+            tr_ds = common.NewsDataset(texts[tr_idx], labels[tr_idx], vocab)
+            va_ds = common.NewsDataset(texts[va_idx], labels[va_idx], vocab)
+            tr_loader = DataLoader(tr_ds, batch_size=BATCH_SIZE, shuffle=True)
+            va_loader = DataLoader(va_ds, batch_size=BATCH_SIZE)
+            for ep in range(args.epochs):
+                loss, acc = common.train_one_epoch(model, tr_loader, optimizer, criterion, device)
+                print(f"      fold {fold} ep {ep+1}: loss={loss:.4f} acc={acc:.4f}")
+            f1 = common.evaluate(model, va_loader, device)
+            fold_scores.append(f1)
+            print(f"      fold {fold}: macro F1 = {f1:.4f}  (用时 {time.time()-t0:.0f}s)")
+        cv_f1 = float(np.mean(fold_scores))
+        std = float(np.std(fold_scores))
+        print(f"      => CV macro F1 = {cv_f1:.4f} ± {std:.4f}")
+        record("word2vec_bilstm_attn", "baseline", cv_f1, std,
+               f"Word2Vec({common.EMBED_DIM}d)+BiLSTM(128)+Attention, epochs={args.epochs}")
 
     print("[5/6] 全量训练...")
     model = build_model(vocab, embed_matrix, device)

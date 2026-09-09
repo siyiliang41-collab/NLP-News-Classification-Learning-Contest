@@ -20,7 +20,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from config import TRAIN_PATH, TEST_A_PATH, SUBMIT_DIR, SEED, N_FOLDS, NUM_CLASSES, ID2LABEL
 from scoreboard import record
@@ -59,19 +59,39 @@ def run_cv(texts, labels, vocab, embed_matrix, loss_name, epochs, device):
         tr_loader = DataLoader(tr_ds, batch_size=256, shuffle=True)
         va_loader = DataLoader(va_ds, batch_size=256)
         for ep in range(epochs):
-            loss, acc = common.train_one_epoch(model, tr_loader, optimizer, criterion, device)
+            common.train_one_epoch(model, tr_loader, optimizer, criterion, device)
         f1 = common.evaluate(model, va_loader, device)
         fold_scores.append(f1)
         print(f"      fold {fold}: macro F1 = {f1:.4f}")
     return float(np.mean(fold_scores)), float(np.std(fold_scores))
 
 
+def run_holdout(texts, labels, vocab, embed_matrix, loss_name, epochs, device):
+    """留出验证集（省时）：90%训练/10%验证，单次训练，返回 (val_f1, per_class_f1)。"""
+    tr_texts, va_texts, tr_labels, va_labels = train_test_split(
+        texts, labels, test_size=0.1, random_state=SEED, stratify=labels)
+    model = build_model(vocab, embed_matrix, device)
+    criterion, _ = build_criterion(loss_name, tr_labels, device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    tr_loader = DataLoader(common.NewsDataset(tr_texts, tr_labels, vocab), batch_size=256, shuffle=True)
+    va_loader = DataLoader(common.NewsDataset(va_texts, va_labels, vocab), batch_size=256)
+    for ep in range(epochs):
+        loss, acc = common.train_one_epoch(model, tr_loader, optimizer, criterion, device)
+        print(f"      ep {ep+1}: loss={loss:.4f} acc={acc:.4f}")
+    f1 = common.evaluate(model, va_loader, device)
+    per_class = common.evaluate_per_class(model, va_loader, device, ID2LABEL)
+    print(f"      val macro F1 = {f1:.4f}")
+    print(f"      各类别 F1: {per_class}")
+    return float(f1)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--loss", default="all", choices=["ce", "weighted", "focal", "all"])
     parser.add_argument("--subset", type=int, default=0)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--gpu", action="store_true")
+    parser.add_argument("--holdout", action="store_true", help="用留出验证集代替5折CV（省时）")
     args = parser.parse_args()
 
     common.set_seed(SEED)
@@ -94,10 +114,15 @@ def main():
     loss_list = ["ce", "weighted", "focal"] if args.loss == "all" else [args.loss]
     for ln in loss_list:
         print(f"\n[实验] 损失函数 = {ln}")
-        cv_f1, std = run_cv(texts, labels, vocab, embed_matrix, ln, args.epochs, device)
-        print(f"      => CV macro F1 = {cv_f1:.4f} ± {std:.4f}")
-        record("textcnn", f"loss_{ln}", cv_f1, std,
-               f"TextCNN + {build_criterion(ln, labels, device)[1]}, epochs={args.epochs}")
+        if args.holdout:
+            f1 = run_holdout(texts, labels, vocab, embed_matrix, ln, args.epochs, device)
+            record("textcnn", f"loss_{ln}", f1, None,
+                   f"TextCNN + {build_criterion(ln, labels, device)[1]}, holdout, epochs={args.epochs}")
+        else:
+            cv_f1, std = run_cv(texts, labels, vocab, embed_matrix, ln, args.epochs, device)
+            print(f"      => CV macro F1 = {cv_f1:.4f} ± {std:.4f}")
+            record("textcnn", f"loss_{ln}", cv_f1, std,
+                   f"TextCNN + {build_criterion(ln, labels, device)[1]}, epochs={args.epochs}")
 
     print(f"\n[完成] 总用时 {time.time()-t0:.0f}s")
 
