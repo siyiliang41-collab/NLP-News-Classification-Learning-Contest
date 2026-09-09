@@ -26,6 +26,7 @@ MODEL_ORDER = [
     ("word2vec_textcnn", "TextCNN"),
     ("word2vec_bilstm_attn", "BiLSTM+Attn"),
     ("bert", "BERT"),
+    ("ensemble", "多模型融合"),
 ]
 # 取每个模型的最好一次实验
 def _best(df):
@@ -51,7 +52,7 @@ def main():
 
     # 柱状图
     fig, ax = plt.subplots(figsize=(10, 5))
-    colors = ["#4C78A8", "#F58518", "#54A24B", "#E45756"][:len(best)]
+    colors = ["#4C78A8", "#F58518", "#54A24B", "#E45756", "#B279A2"][:len(best)]
     bars = ax.bar(best["name"], best["cv_f1"], color=colors, width=0.5)
     for b, v in zip(bars, best["cv_f1"]):
         ax.text(b.get_x() + b.get_width()/2, v, f"{v:.4f}",
@@ -68,7 +69,7 @@ def main():
     # 折线图（迭代上升趋势）
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(best["name"], best["cv_f1"], marker="o", linewidth=2, color="#4C78A8")
-    for i, (name, v) in enumerate(zip(best["name"], best["cv_f1"])):
+    for name, v in zip(best["name"], best["cv_f1"]):
         ax.annotate(f"{v:.4f}", (name, v), textcoords="offset points",
                     xytext=(0, 10), ha="center", fontsize=10)
     ax.set_ylim(0.8, 1.0)
