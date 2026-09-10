@@ -1,21 +1,27 @@
+# 数值计算与数据处理
 numpy
 pandas
-scikit-learn
 scipy
+
+# 机器学习
+scikit-learn
+joblib
+
+# 可视化
 matplotlib
 seaborn
 tqdm
 
-# 深度学习（跑 BERT/TextCNN 需要 GPU）
+# 深度学习（跑 TextCNN/BiLSTM/BERT 需要 GPU）
 torch
-torchvision
 
 # 预训练模型
 transformers
 tokenizers
 
-# 词向量与特征
+# 词向量
 gensim
 
-# 交互式界面（答辩演示）
-gradio
+# Web 后端（答辩演示）
+fastapi
+uvicorn
