@@ -1,0 +1,33 @@
+# Data (large, not tracked)
+data/train/*.csv
+data/test_a/*.csv
+data/submit/*.csv
+data/demo_pool.csv
+
+# Models & outputs
+models/
+output/*
+!output/figs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs temp
+docs/_extract_*
