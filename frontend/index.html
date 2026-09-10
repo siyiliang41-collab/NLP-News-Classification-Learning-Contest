@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧笔迹 · NLP 新闻分类系统</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-logo">📝</span>
+        <div>
+          <h1>智慧笔迹 · NLP 新闻分类系统</h1>
+          <p class="subtitle">14 类中文新闻文本多分类 · 字符级匿名化数据</p>
+        </div>
+      </div>
+      <div class="model-badge" id="modelBadge">模型：加载中…</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 左列：输入区 -->
+    <section class="panel input-panel">
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="sample">🎲 随机样本演示</button>
+        <button class="tab" data-tab="verify">✅ 验证演示</button>
+        <button class="tab" data-tab="manual">⌨️ 手动输入</button>
+      </div>
+
+      <div class="tab-body active" id="tab-sample">
+        <p class="hint">从测试集（无标签）随机抽取一条真实新闻，观察模型的判断结果。</p>
+        <button class="btn secondary" id="btnSample">🎲 随机取一条</button>
+      </div>
+
+      <div class="tab-body" id="tab-verify">
+        <p class="hint">从「模型从未见过的验证池」抽取带真实标签的样本，预测后揭晓对错并累计正确率。</p>
+        <button class="btn secondary" id="btnDemo">🎲 取带标签样本</button>
+        <div class="scoreboard">
+          <span>累计正确率：</span>
+          <strong id="scoreText">0 / 0</strong>
+          <span id="scorePct" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="tab-body" id="tab-manual">
+        <p class="hint">粘贴「空格分隔的数字 token」文本（赛题匿名化格式），进行预测。</p>
+      </div>
+
+      <div class="text-box-wrap">
+        <textarea id="textInput" class="text-input" rows="7"
+          placeholder="点击上方按钮获取样本，或在此粘贴匿名 token 文本…"></textarea>
+        <div class="text-meta">
+          <span id="charCount">0 token</span>
+          <span id="trueLabelBadge" class="hidden"></span>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn primary" id="btnPredict" disabled>🔮 开始预测</button>
+        <button class="btn ghost" id="btnClear">清空</button>
+      </div>
+    </section>
+
+    <!-- 右列：结果区 -->
+    <section class="panel result-panel">
+      <div class="result-empty" id="resultEmpty">
+        <div class="empty-icon">🔍</div>
+        <p>预测结果将在这里展示</p>
+      </div>
+
+      <div class="result-body hidden" id="resultBody">
+        <div class="prediction-head">
+          <div class="pred-label" id="predLabel">—</div>
+          <div class="pred-conf" id="predConf">—</div>
+        </div>
+
+        <div class="chart-wrap" id="probChart"></div>
+
+        <div class="top3" id="top3"></div>
+
+        <div class="keywords-block" id="keywordsBlock">
+          <div class="block-title">模型关注的关键特征（n-gram）</div>
+          <div class="keywords" id="keywords"></div>
+        </div>
+
+        <div class="verify-result hidden" id="verifyResult">
+          <div class="block-title">验证结果</div>
+          <div class="verify-lines">
+            <div>真实标签：<span id="trueLabel" class="tag"></span></div>
+            <div>预测标签：<span id="predLabelSmall" class="tag"></span></div>
+            <div>判定：<span id="verdict" class="tag"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>智慧笔迹 · NLP 新闻分类学习赛 课设演示</span>
+    <span id="footerMeta"></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

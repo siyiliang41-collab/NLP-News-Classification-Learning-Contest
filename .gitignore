@@ -2,6 +2,7 @@
 data/train/*.csv
 data/test_a/*.csv
 data/submit/*.csv
+data/demo_pool.csv
 
 # Models & outputs
 models/
