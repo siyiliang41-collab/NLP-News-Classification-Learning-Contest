@@ -38,7 +38,7 @@ label_map = {
 | ② 深度·CNN | Word2Vec + TextCNN | **0.9183** ± 0.0024 | **+7.2** | 5 折 CV，skip-gram，filters=[2,3,4] |
 | ③ 深度·RNN | Word2Vec + BiLSTM + Attn | **0.9241** | +0.6 | holdout，BiLSTM(128)+Attention |
 | ④ 预训练 | BERT 微调 | **0.9240** | ≈持平 | bert-base-chinese，holdout |
-| ⑤ 融合 | 硬投票（BERT + TextCNN + TFIDF-LR） | **0.9332** | **+0.9** | 最终最高分，总提升 +8.7 |
+| ⑤ 融合 | 硬投票（BiLSTM + TextCNN + TFIDF-LR） | **0.9332** | **+0.9** | 最终最高分，总提升 +8.7 |
 
 > 分数统一登记在 [`docs/scores.csv`](docs/scores.csv) 台账中，可视化见 [`src/plot_scores.py`](src/plot_scores.py)。
 
